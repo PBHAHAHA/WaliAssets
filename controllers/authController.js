@@ -46,7 +46,7 @@ const register = async (req, res) => {
       username,
       email,
       password,
-      tokenBalance: DEFAULT_REGISTER_TOKENS
+      tokenBalance: 0
     });
 
     await addTokens(

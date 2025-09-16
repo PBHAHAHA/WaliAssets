@@ -1,9 +1,11 @@
 const crypto = require('crypto');
+const dotenv = require('dotenv');
 
+dotenv.config();
 const ZPAY_CONFIG = {
-  baseUrl: 'https://zpayz.cn',
-  pid: '2025012415175410',
-  key: 'FWIjZY1CSWhozEttkoiZ2Onx9HO0xx5C',
+  baseUrl: process.env.ZPAY_URL,
+  pid: process.env.ZPAY_PID,
+  key: process.env.ZPAY_PKEY,
 
   endpoints: {
     submit: '/submit.php',

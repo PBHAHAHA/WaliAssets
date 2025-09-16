@@ -1,13 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
-const imageController = require('../controllers/imageController');
-const animationController = require('../controllers/animationController');
 const authRoutes = require('./auth');
 const tokenRoutes = require('./token');
 const paymentRoutes = require('./payment');
-const { authenticateToken } = require('../middleware/auth');
-const { requireTokens } = require('../middleware/tokenConsume');
+const generateRoutes = require('./generate');
 
 router.get("/", (req, res) => {
     res.json({
@@ -24,18 +21,7 @@ router.use('/token', tokenRoutes);
 // 支付路由
 router.use('/payment', paymentRoutes);
 
-// 图像生成 - 需要登录和token消耗
-router.post('/generate-image', 
-    authenticateToken, 
-    requireTokens('IMAGE_GENERATION'), 
-    imageController.generateImage
-);
-
-// 动画生成 - 需要登录和token消耗
-router.post('/generate-animation', 
-    authenticateToken, 
-    requireTokens('VIDEO_GENERATION'), 
-    animationController.generateAnimation
-);
+// 生成路由
+router.use('/generate', generateRoutes);
 
 module.exports = router;
