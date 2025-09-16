@@ -3,18 +3,39 @@ const router = express.Router();
 
 const imageController = require('../controllers/imageController');
 const animationController = require('../controllers/animationController');
-const removeBackgroundController = require('../controllers/removeBackgroundController');
+const authRoutes = require('./auth');
+const tokenRoutes = require('./token');
+const paymentRoutes = require('./payment');
+const { authenticateToken } = require('../middleware/auth');
+const { requireTokens } = require('../middleware/tokenConsume');
+
 router.get("/", (req, res) => {
     res.json({
         message: "Hello World"
     })
 })
 
-// 图像生成
-router.post('/generate-image', imageController.generateImage);
-// 动画生成
-router.post('/generate-animation', animationController.generateAnimation);
-// 抠图
-router.post('/remove-background', removeBackgroundController.removeBackground);
+// 认证路由
+router.use('/auth', authRoutes);
+
+// Token路由
+router.use('/token', tokenRoutes);
+
+// 支付路由
+router.use('/payment', paymentRoutes);
+
+// 图像生成 - 需要登录和token消耗
+router.post('/generate-image', 
+    authenticateToken, 
+    requireTokens('IMAGE_GENERATION'), 
+    imageController.generateImage
+);
+
+// 动画生成 - 需要登录和token消耗
+router.post('/generate-animation', 
+    authenticateToken, 
+    requireTokens('VIDEO_GENERATION'), 
+    animationController.generateAnimation
+);
 
 module.exports = router;
