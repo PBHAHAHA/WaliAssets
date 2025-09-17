@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const ALLOWED_EMAIL_DOMAINS = [
   'qq.com',
   'gmail.com',
-  'googlemail.com'
 ];
 
 /**

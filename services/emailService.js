@@ -5,15 +5,24 @@ const createTransporter = () => {
   // 这里使用环境变量配置SMTP服务器
   const config = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
-    secure: false,
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: true, // 587端口使用STARTTLS
+    // requireTLS: true, // 强制使用TLS
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
-    }
+    },
+    // 163邮箱特定配置
+    // tls: {
+    //   rejectUnauthorized: false // 允许自签名证书
+    // },
+    // connectionTimeout: 10000, // 连接超时10秒
+    // socketTimeout: 10000, // socket超时10秒
+    logger: true, // 启用日志
+    debug: false // 关闭调试模式
   };
 
-  return nodemailer.createTransporter(config);
+  return nodemailer.createTransport(config);
 };
 
 /**
