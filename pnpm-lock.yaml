@@ -38,6 +38,9 @@ importers:
       node-cron:
         specifier: ^4.2.1
         version: 4.2.1
+      nodemailer:
+        specifier: ^7.0.6
+        version: 7.0.6
       sequelize:
         specifier: ^6.37.7
         version: 6.37.7(mysql2@3.14.5)
@@ -526,6 +529,10 @@ packages:
 
   node-cron@4.2.1:
     resolution: {integrity: sha512-lgimEHPE/QDgFlywTd8yTR61ptugX3Qer29efeyWw2rv259HtGBNn1vZVmp8lB9uo9wC0t/AT4iGqXxia+CJFg==}
+    engines: {node: '>=6.0.0'}
+
+  nodemailer@7.0.6:
+    resolution: {integrity: sha512-F44uVzgwo49xboqbFgBGkRaiMgtoBrBEWCVincJPK9+S9Adkzt/wXCLKbf7dxucmxfTI5gHGB+bEmdyzN6QKjw==}
     engines: {node: '>=6.0.0'}
 
   nodemon@3.1.10:
@@ -1283,6 +1290,8 @@ snapshots:
   negotiator@1.0.0: {}
 
   node-cron@4.2.1: {}
+
+  nodemailer@7.0.6: {}
 
   nodemon@3.1.10:
     dependencies:

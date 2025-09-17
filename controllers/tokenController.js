@@ -4,7 +4,7 @@ const DEFAULT_REGISTER_TOKENS = 100;
 
 const TOKEN_COSTS = {
   IMAGE_GENERATION: 10,
-  VIDEO_GENERATION: 50
+  VIDEO_GENERATION: 100
 };
 
 const addTokens = async (userId, type, amount, description = '', metadata = {}) => {

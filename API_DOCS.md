@@ -28,15 +28,64 @@
 
 ## 认证相关 `/api/auth`
 
-### 用户注册
-- **接口**: `POST /api/auth/register`
-- **描述**: 用户注册
+### 发送邮箱验证码
+- **接口**: `POST /api/auth/send-code`
+- **描述**: 发送邮箱验证码
+- **支持邮箱**: qq.com, gmail.com, googlemail.com
 - **请求体**:
 ```json
 {
-  "email": "user@example.com",
+  "email": "user@qq.com",
+  "type": "register"
+}
+```
+- **响应**:
+```json
+{
+  "success": true,
+  "message": "验证码已发送到您的邮箱，请查收",
+  "data": {
+    "email": "user@qq.com",
+    "expiresIn": 600
+  }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "message": "暂时只支持以下邮箱注册：qq.com, gmail.com, googlemail.com",
+  "allowedDomains": ["qq.com", "gmail.com", "googlemail.com"]
+}
+```
+
+### 用户注册
+- **接口**: `POST /api/auth/register`
+- **描述**: 用户注册（需要邮箱验证码）
+- **请求体**:
+```json
+{
+  "email": "user@qq.com",
   "password": "password123",
-  "username": "username"
+  "username": "username",
+  "emailCode": "123456"
+}
+```
+- **响应**:
+```json
+{
+  "success": true,
+  "message": "用户注册成功，获得 100 tokens奖励",
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "username",
+      "email": "user@qq.com",
+      "tokenBalance": 100
+    },
+    "token": "jwt_token_here",
+    "tokenBonus": 100
+  }
 }
 ```
 
@@ -164,11 +213,11 @@
 ```json
 {
   "success": true,
-  "message": "图片生成成功，消耗 10 tokens",
+  "message": "图片生成成功，消耗 20 tokens",
   "data": {
     "taskId": "img_1234567890_abc123",
     "image_url": "https://example.com/image.jpg",
-    "tokenConsumed": 10
+    "tokenConsumed": 20
   }
 }
 ```
@@ -188,11 +237,11 @@
 ```json
 {
   "success": true,
-  "message": "视频生成成功，消耗 50 tokens",
+  "message": "视频生成成功，消耗 100 tokens",
   "data": {
     "taskId": "anim_1234567890_abc123",
     "video_url": "https://example.com/video.mp4",
-    "tokenConsumed": 50
+    "tokenConsumed": 100
   }
 }
 ```
@@ -254,7 +303,7 @@
         "taskId": "img_1234567890_abc123",
         "resultUrl": "https://example.com/image.jpg",
         "resultUrls": ["https://example.com/image.jpg"],
-        "tokenConsumed": 10,
+        "tokenConsumed": 20,
         "errorMessage": null,
         "progress": 100,
         "createdAt": "2024-01-01T12:00:00Z",
@@ -269,7 +318,7 @@
     },
     "summary": {
       "totalGenerated": 1,
-      "totalTokensConsumed": 10
+      "totalTokensConsumed": 20
     }
   }
 }
@@ -286,32 +335,53 @@
 }
 ```
 
+## 邮箱验证说明
+
+### 支持的邮箱域名
+- **qq.com** - QQ邮箱
+- **gmail.com** - 谷歌邮箱
+- **googlemail.com** - 谷歌邮箱（部分地区）
+
+### 验证码规则
+- **格式**: 6位随机数字
+- **有效期**: 10分钟
+- **发送频率**: 每个邮箱1分钟内只能发送一次
+- **验证次数**: 每个验证码最多尝试3次
+- **使用限制**: 验证码只能使用一次，使用后自动失效
+
+### 注册流程
+1. 调用 `/auth/send-code` 发送验证码到邮箱
+2. 用户收到邮箱验证码（6位数字）
+3. 调用 `/auth/register` 提交注册信息和验证码
+4. 验证通过后完成注册，获得100 tokens奖励
+
 ## 错误代码
 
 | 状态码 | 说明 |
 |--------|------|
-| 400 | 请求参数错误 |
+| 400 | 请求参数错误、邮箱域名不支持、验证码无效 |
 | 401 | 未认证或Token无效 |
-| 403 | Token余额不足 |
+| 402 | Token余额不足 |
 | 404 | 资源不存在 |
+| 429 | 验证码发送过于频繁 |
 | 500 | 服务器内部错误 |
 
 ## Token套餐
 
 | 套餐ID | Token数量 | 价格 | 名称 |
 |--------|-----------|------|------|
-| package_100 | 100 | ¥1.00 | 100 Tokens |
-| package_500 | 500 | ¥4.50 | 500 Tokens |
-| package_1000 | 1000 | ¥8.00 | 1000 Tokens |
-| package_2000 | 2000 | ¥15.00 | 2000 Tokens |
-| package_5000 | 5000 | ¥35.00 | 5000 Tokens |
+| package_100 | 100 | ¥2.00 | 100 Tokens |
+| package_500 | 500 | ¥9.00 | 500 Tokens |
+| package_1000 | 1000 | ¥16.00 | 1000 Tokens |
+| package_2000 | 2000 | ¥30.00 | 2000 Tokens |
+| package_5000 | 5000 | ¥70.00 | 5000 Tokens |
 
 ## Token消耗
 
 | 功能 | 消耗类型 | 消耗数量 |
 |------|----------|----------|
-| 图像生成 | IMAGE_GENERATION | 根据配置 |
-| 动画生成 | VIDEO_GENERATION | 根据配置 |
+| 图像生成 | IMAGE_GENERATION | 20 tokens |
+| 动画生成 | VIDEO_GENERATION | 100 tokens |
 
 ## 认证说明
 

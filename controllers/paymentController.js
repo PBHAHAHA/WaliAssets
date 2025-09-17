@@ -9,11 +9,11 @@ const { PaymentOrder } = require('../models');
 const { ZPAY_CONFIG } = require('../config/payment');
 
 const TOKEN_PACKAGES = {
-  'package_100': { tokens: 100, price: 1.00, name: '100 Tokens' },
-  'package_500': { tokens: 500, price: 4.50, name: '500 Tokens' },
-  'package_1000': { tokens: 1000, price: 8.00, name: '1000 Tokens' },
-  'package_2000': { tokens: 2000, price: 15.00, name: '2000 Tokens' },
-  'package_5000': { tokens: 5000, price: 35.00, name: '5000 Tokens' }
+  'package_100': { tokens: 100, price: 2.00, name: '100 Tokens' },
+  'package_500': { tokens: 500, price: 9.00, name: '500 Tokens' },
+  'package_1000': { tokens: 1000, price: 16.00, name: '1000 Tokens' },
+  'package_2000': { tokens: 2000, price: 30.00, name: '2000 Tokens' },
+  'package_5000': { tokens: 5000, price: 70.00, name: '5000 Tokens' }
 };
 
 const createPayment = async (req, res) => {

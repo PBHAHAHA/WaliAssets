@@ -3,6 +3,7 @@ const User = require('./User');
 const TokenTransaction = require('./TokenTransaction');
 const PaymentOrder = require('./PaymentOrder');
 const GenerationHistory = require('./GenerationHistory');
+const EmailVerification = require('./EmailVerification');
 
 User.hasMany(TokenTransaction, { foreignKey: 'userId', as: 'tokenTransactions' });
 TokenTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -18,7 +19,8 @@ const db = {
   User,
   TokenTransaction,
   PaymentOrder,
-  GenerationHistory
+  GenerationHistory,
+  EmailVerification
 };
 
 module.exports = db;

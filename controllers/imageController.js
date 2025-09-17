@@ -13,7 +13,7 @@ exports.generateImage = async (req, res) => {
             size = "512x512",
             guidance_scale = 2.5,
             seed = 12345,
-            watermark = true,
+            watermark = false,
             image
         } = req.body;
 

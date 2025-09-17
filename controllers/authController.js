@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const { User, EmailVerification } = require('../models');
 const { addTokens, DEFAULT_REGISTER_TOKENS } = require('./tokenController');
+const { sendVerificationEmail } = require('../services/emailService');
+const { isEmailDomainAllowed, generateVerificationCode, getAllowedDomains } = require('../utils/emailUtils');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -8,14 +10,97 @@ const generateToken = (id) => {
   });
 };
 
-const register = async (req, res) => {
+// 发送邮箱验证码
+const sendEmailCode = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { email, type = 'register' } = req.body;
 
-    if (!username || !email || !password) {
+    if (!email) {
       return res.status(400).json({
         success: false,
-        message: '用户名、邮箱和密码都是必填项'
+        message: '邮箱地址是必填项'
+      });
+    }
+
+    // 验证邮箱域名
+    if (!isEmailDomainAllowed(email)) {
+      return res.status(400).json({
+        success: false,
+        message: `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
+        allowedDomains: getAllowedDomains()
+      });
+    }
+
+    // 检查邮箱是否已注册（仅注册时检查）
+    if (type === 'register') {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: '邮箱已被注册'
+        });
+      }
+    }
+
+    // 检查最近是否已发送验证码（防止频繁发送）
+    const recentCode = await EmailVerification.findOne({
+      where: {
+        email,
+        type,
+        createdAt: {
+          [require('sequelize').Op.gte]: new Date(Date.now() - 60000) // 1分钟内
+        }
+      }
+    });
+
+    if (recentCode) {
+      return res.status(429).json({
+        success: false,
+        message: '验证码发送过于频繁，请1分钟后再试'
+      });
+    }
+
+    // 生成验证码
+    const code = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟后过期
+
+    // 保存验证码
+    await EmailVerification.create({
+      email,
+      code,
+      type,
+      expiresAt
+    });
+
+    // 发送邮件
+    await sendVerificationEmail(email, code, type);
+
+    res.json({
+      success: true,
+      message: '验证码已发送到您的邮箱，请查收',
+      data: {
+        email,
+        expiresIn: 600 // 10分钟
+      }
+    });
+
+  } catch (error) {
+    console.error('发送验证码错误:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '发送验证码失败'
+    });
+  }
+};
+
+const register = async (req, res) => {
+  try {
+    const { username, email, password, emailCode } = req.body;
+
+    if (!username || !email || !password || !emailCode) {
+      return res.status(400).json({
+        success: false,
+        message: '用户名、邮箱、密码和验证码都是必填项'
       });
     }
 
@@ -23,6 +108,40 @@ const register = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: '密码长度至少为6位'
+      });
+    }
+
+    // 验证邮箱域名
+    if (!isEmailDomainAllowed(email)) {
+      return res.status(400).json({
+        success: false,
+        message: `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
+        allowedDomains: getAllowedDomains()
+      });
+    }
+
+    // 验证邮箱验证码
+    const verification = await EmailVerification.findOne({
+      where: {
+        email,
+        code: emailCode,
+        type: 'register',
+        used: false
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!verification) {
+      return res.status(400).json({
+        success: false,
+        message: '验证码无效'
+      });
+    }
+
+    if (!verification.isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: '验证码已过期或已使用'
       });
     }
 
@@ -41,6 +160,9 @@ const register = async (req, res) => {
         message: '用户名或邮箱已存在'
       });
     }
+
+    // 标记验证码为已使用
+    await verification.markAsUsed();
 
     const user = await User.create({
       username,
@@ -237,6 +359,7 @@ const updateProfile = async (req, res) => {
 };
 
 module.exports = {
+  sendEmailCode,
   register,
   login,
   getProfile,
