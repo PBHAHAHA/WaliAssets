@@ -7,13 +7,23 @@ const { connectDB } = require('./config/database');
 
 // 加载环境变量
 dotenv.config();
-console.log(process.env.ARK_API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
 // 中间件
-app.use(cors());
+const corsOptions = {
+  origin: [
+    'https://pixel.iwali.cn',
+    'http://pixel.iwali.cn',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
