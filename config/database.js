@@ -25,9 +25,14 @@ const connectDB = async () => {
   try {
     await sequelize.authenticate();
     console.log('MySQL数据库连接成功');
-    
-    await sequelize.sync({ alter: true });
-    console.log('数据库表同步完成');
+
+    // 生产环境不自动同步，避免索引冲突
+    if (process.env.NODE_ENV === 'production') {
+      console.log('生产环境，跳过自动表同步');
+    } else {
+      await sequelize.sync({ force: false });
+      console.log('数据库表同步完成');
+    }
   } catch (error) {
     console.error('无法连接到数据库:', error);
     process.exit(1);
