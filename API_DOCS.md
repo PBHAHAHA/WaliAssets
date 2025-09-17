@@ -9,20 +9,35 @@
 
 ## 通用响应格式
 
+**重要更新**: 所有API接口现在使用统一的响应格式，HTTP状态码通常为200，业务状态通过`code`字段表示。
+
 ### 成功响应
 ```json
 {
   "success": true,
+  "code": 1,
   "message": "操作成功",
   "data": {}
 }
 ```
 
-### 错误响应
+### 业务错误响应
 ```json
 {
   "success": false,
-  "error": "错误信息"
+  "code": 1001,
+  "message": "无效的token",
+  "data": null
+}
+```
+
+### 系统错误响应
+```json
+{
+  "success": false,
+  "code": 9000,
+  "message": "系统内部错误",
+  "data": null
 }
 ```
 
@@ -39,10 +54,11 @@
   "type": "register"
 }
 ```
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
   "message": "验证码已发送到您的邮箱，请查收",
   "data": {
     "email": "user@qq.com",
@@ -54,8 +70,11 @@
 ```json
 {
   "success": false,
-  "message": "暂时只支持以下邮箱注册：qq.com, gmail.com, googlemail.com",
-  "allowedDomains": ["qq.com", "gmail.com", "googlemail.com"]
+  "code": 1101,
+  "message": "暂时只支持以下邮箱注册：qq.com, gmail.com",
+  "data": {
+    "allowedDomains": ["qq.com", "gmail.com"]
+  }
 }
 ```
 
@@ -71,14 +90,15 @@
   "emailCode": "123456"
 }
 ```
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
   "message": "用户注册成功，获得 100 tokens奖励",
   "data": {
     "user": {
-      "id": 1,
+      "id": "uuid-string",
       "username": "username",
       "email": "user@qq.com",
       "tokenBalance": 100
@@ -86,6 +106,15 @@
     "token": "jwt_token_here",
     "tokenBonus": 100
   }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "code": 1102,
+  "message": "验证码无效",
+  "data": null
 }
 ```
 
@@ -99,20 +128,30 @@
   "password": "password123"
 }
 ```
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
   "message": "登录成功",
   "data": {
-    "token": "jwt_token_here",
     "user": {
-      "id": 1,
-      "email": "user@example.com",
+      "id": "uuid-string",
+      "email": "user@qq.com",
       "username": "username",
       "tokenBalance": 100
-    }
+    },
+    "token": "jwt_token_here"
   }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "code": 1004,
+  "message": "邮箱或密码错误",
+  "data": null
 }
 ```
 
@@ -121,13 +160,29 @@
 ### 获取Token余额
 - **接口**: `GET /api/token/balance`
 - **认证**: 需要
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
+  "message": "操作成功",
   "data": {
-    "balance": 100
+    "balance": 100,
+    "user": {
+      "id": "uuid-string",
+      "username": "username",
+      "email": "user@qq.com"
+    }
   }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "code": 1001,
+  "message": "无效的token",
+  "data": null
 }
 ```
 
@@ -136,8 +191,37 @@
 - **认证**: 需要
 - **查询参数**:
   - `page`: 页码 (默认: 1)
-  - `limit`: 每页数量 (默认: 10)
+  - `limit`: 每页数量 (默认: 20)
   - `type`: 交易类型 (可选)
+- **成功响应**:
+```json
+{
+  "success": true,
+  "code": 1,
+  "message": "操作成功",
+  "data": {
+    "transactions": [
+      {
+        "id": 1,
+        "type": "IMAGE_GENERATION",
+        "amount": -20,
+        "balance": 80,
+        "description": "图像生成",
+        "metadata": {
+          "taskId": "img_1234567890_abc123"
+        },
+        "createdAt": "2024-01-01T12:00:00Z"
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 1
+    }
+  }
+}
+```
 
 ## 支付相关 `/api/payment`
 
@@ -152,6 +236,29 @@
   "returnUrl": "http://example.com/return"
 }
 ```
+- **成功响应**:
+```json
+{
+  "success": true,
+  "code": 1,
+  "message": "订单创建成功",
+  "data": {
+    "orderId": "order_123456",
+    "outTradeNo": "trade_789012",
+    "payUrl": "https://payment.example.com/pay?order=xxx",
+    "qrCode": "https://qr.example.com/qrcode.png"
+  }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "code": 1406,
+  "message": "无效的套餐类型",
+  "data": null
+}
+```
 
 ### 查询订单状态
 - **接口**: `GET /api/payment/query`
@@ -159,20 +266,61 @@
 - **查询参数**:
   - `orderId`: 订单ID
   - `outTradeNo`: 商户订单号
-
-### 获取支付套餐
-- **接口**: `GET /api/payment/packages`
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
+  "message": "操作成功",
+  "data": {
+    "localOrder": {
+      "id": "order_123456",
+      "outTradeNo": "trade_789012",
+      "tradeNo": "remote_trade_345678",
+      "name": "100 Tokens",
+      "money": 2.00,
+      "type": "alipay",
+      "status": 1,
+      "tokenAmount": 100,
+      "createdAt": "2024-01-01T12:00:00Z",
+      "paidAt": "2024-01-01T12:05:00Z"
+    },
+    "remoteOrder": {
+      "status": 1,
+      "tradeNo": "remote_trade_345678",
+      "totalFee": 2.00
+    }
+  }
+}
+```
+
+### 获取支付套餐
+- **接口**: `GET /api/payment/packages`
+- **成功响应**:
+```json
+{
+  "success": true,
+  "code": 1,
+  "message": "操作成功",
   "data": {
     "packages": [
       {
         "id": "package_100",
         "tokens": 100,
-        "price": 1.00,
+        "price": 2.00,
         "name": "100 Tokens"
+      },
+      {
+        "id": "package_500",
+        "tokens": 500,
+        "price": 9.00,
+        "name": "500 Tokens"
+      },
+      {
+        "id": "package_1000",
+        "tokens": 1000,
+        "price": 16.00,
+        "name": "1000 Tokens"
       }
     ],
     "paymentTypes": [
@@ -180,6 +328,11 @@
         "id": "alipay",
         "name": "支付宝",
         "icon": "alipay"
+      },
+      {
+        "id": "wxpay",
+        "name": "微信支付",
+        "icon": "wechat"
       }
     ]
   }
@@ -209,15 +362,29 @@
   "watermark": true
 }
 ```
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
   "message": "图片生成成功，消耗 20 tokens",
   "data": {
     "taskId": "img_1234567890_abc123",
     "image_url": "https://example.com/image.jpg",
     "tokenConsumed": 20
+  }
+}
+```
+- **Token不足错误**:
+```json
+{
+  "success": false,
+  "code": 1301,
+  "message": "Token余额不足，当前余额: 5, 需要: 20",
+  "data": {
+    "currentBalance": 5,
+    "required": 20,
+    "shortfall": 15
   }
 }
 ```
@@ -233,10 +400,11 @@
   "content": "动画内容描述或图像数据"
 }
 ```
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
   "message": "视频生成成功，消耗 100 tokens",
   "data": {
     "taskId": "anim_1234567890_abc123",
@@ -245,14 +413,29 @@
   }
 }
 ```
+- **Token不足错误**:
+```json
+{
+  "success": false,
+  "code": 1301,
+  "message": "Token余额不足，当前余额: 50, 需要: 100",
+  "data": {
+    "currentBalance": 50,
+    "required": 100,
+    "shortfall": 50
+  }
+}
+```
 
 ### 查询任务状态
 - **接口**: `GET /api/generate/status/:taskId`
 - **认证**: 需要
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
+  "message": "操作成功",
   "data": {
     "taskId": "img_1234567890_abc123",
     "status": "completed",
@@ -264,6 +447,15 @@
     "createdAt": "2024-01-01T12:00:00Z",
     "updatedAt": "2024-01-01T12:01:00Z"
   }
+}
+```
+- **任务不存在错误**:
+```json
+{
+  "success": false,
+  "code": 1501,
+  "message": "任务不存在",
+  "data": null
 }
 ```
 
@@ -283,10 +475,12 @@
   - `status`: 状态筛选 (可选: pending, processing, completed, failed)
   - `startDate`: 开始日期 (可选: YYYY-MM-DD)
   - `endDate`: 结束日期 (可选: YYYY-MM-DD)
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
+  "code": 1,
+  "message": "操作成功",
   "data": {
     "history": [
       {
@@ -327,11 +521,22 @@
 ### 删除生成历史
 - **接口**: `DELETE /api/generate/history/:id`
 - **认证**: 需要
-- **响应**:
+- **成功响应**:
 ```json
 {
   "success": true,
-  "message": "删除成功"
+  "code": 1,
+  "message": "删除成功",
+  "data": null
+}
+```
+- **权限不足错误**:
+```json
+{
+  "success": false,
+  "code": 1203,
+  "message": "权限不足",
+  "data": null
 }
 ```
 
@@ -340,7 +545,6 @@
 ### 支持的邮箱域名
 - **qq.com** - QQ邮箱
 - **gmail.com** - 谷歌邮箱
-- **googlemail.com** - 谷歌邮箱（部分地区）
 
 ### 验证码规则
 - **格式**: 6位随机数字
@@ -355,16 +559,26 @@
 3. 调用 `/auth/register` 提交注册信息和验证码
 4. 验证通过后完成注册，获得100 tokens奖励
 
-## 错误代码
+## 业务错误代码
 
-| 状态码 | 说明 |
+**重要**: 所有业务错误HTTP状态码均为200，具体错误信息通过响应体中的`code`字段判断。详细的业务错误码定义请参考 [BUSINESS_CODES.md](./BUSINESS_CODES.md)
+
+### 常用错误码
+
+| 业务码 | 说明 |
 |--------|------|
-| 400 | 请求参数错误、邮箱域名不支持、验证码无效 |
-| 401 | 未认证或Token无效 |
-| 402 | Token余额不足 |
-| 404 | 资源不存在 |
-| 429 | 验证码发送过于频繁 |
-| 500 | 服务器内部错误 |
+| 1 | 操作成功 |
+| 1001 | 无效的token |
+| 1002 | token已过期 |
+| 1003 | 缺少认证token |
+| 1004 | 登录失败 |
+| 1101 | 邮箱域名不支持 |
+| 1102 | 验证码无效 |
+| 1103 | 验证码已过期 |
+| 1301 | Token余额不足 |
+| 1406 | 无效的套餐类型 |
+| 1501 | 任务不存在 |
+| 9000 | 系统内部错误 |
 
 ## Token套餐
 
@@ -425,6 +639,25 @@ const response = await fetch('/api/payment/create', {
 });
 
 const result = await response.json();
+
+if (result.success) {
+  console.log('支付订单创建成功:', result.data);
+  // 跳转到支付页面
+  window.location.href = result.data.payUrl;
+} else {
+  console.error('创建失败:', result.message, 'Code:', result.code);
+  // 根据错误码处理不同错误
+  switch (result.code) {
+    case 1301:
+      alert('Token余额不足，请先充值');
+      break;
+    case 1406:
+      alert('无效的套餐类型');
+      break;
+    default:
+      alert(result.message);
+  }
+}
 ```
 
 ### 查询生成历史
@@ -439,6 +672,11 @@ const response = await fetch('/api/generate/history?page=1&limit=5&type=image&st
 });
 
 const result = await response.json();
-console.log('生成历史:', result.data.history);
-console.log('总计消耗token:', result.data.summary.totalTokensConsumed);
+
+if (result.success) {
+  console.log('生成历史:', result.data.history);
+  console.log('总计消耗token:', result.data.summary.totalTokensConsumed);
+} else {
+  console.error('获取历史失败:', result.message, 'Code:', result.code);
+}
 ```

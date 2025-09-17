@@ -2,6 +2,7 @@
 const volcengineService = require('../services/volcengineService');
 const { consumeTokens } = require('./tokenController');
 const { GenerationHistory } = require('../models');
+const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
 
 exports.generateImage = async (req, res) => {
     const taskId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -18,10 +19,7 @@ exports.generateImage = async (req, res) => {
         } = req.body;
 
         if (!prompt || !prompt.trim()) {
-            return res.status(400).json({
-                success: false,
-                error: 'Prompt不能为空'
-            });
+            return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, 'Prompt不能为空');
         }
 
         // 创建生成历史记录
@@ -88,15 +86,11 @@ exports.generateImage = async (req, res) => {
             progress: 100
         });
 
-        res.json({
-            success: true,
-            message: `图片生成成功，消耗 ${req.tokenCost} tokens`,
-            data: {
-                taskId,
-                image_url: result.data[0].url,
-                tokenConsumed: req.tokenCost
-            }
-        });
+        return sendSuccess(res, {
+            taskId,
+            image_url: result.data[0].url,
+            tokenConsumed: req.tokenCost
+        }, `图片生成成功，消耗 ${req.tokenCost} tokens`);
     } catch (error) {
         console.error('图像生成错误:', error);
 
@@ -109,10 +103,14 @@ exports.generateImage = async (req, res) => {
             });
         }
 
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            taskId
-        });
+        if (error.message.includes('Token余额不足')) {
+            return sendBusinessError(res, BUSINESS_CODES.TOKEN_INSUFFICIENT, error.message);
+        }
+
+        if (error.message.includes('生成失败') || error.message.includes('AI服务')) {
+            return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_FAILED, error.message);
+        }
+
+        return sendSystemError(res, '图片生成失败', { taskId });
     }
 }

@@ -10,6 +10,11 @@ const getClientIp = (req) => {
 };
 
 const createPaymentOrder = async (orderData) => {
+  // 检查支付配置是否完整
+  if (!ZPAY_CONFIG.baseUrl || !ZPAY_CONFIG.pid || !ZPAY_CONFIG.key) {
+    throw new Error('支付服务配置不完整，请联系管理员');
+  }
+
   const {
     userId,
     name,
@@ -94,13 +99,22 @@ const createPaymentOrder = async (orderData) => {
 };
 
 const queryPaymentOrder = async (outTradeNo) => {
+  // 检查支付配置是否完整
+  if (!ZPAY_CONFIG.baseUrl || !ZPAY_CONFIG.pid || !ZPAY_CONFIG.key) {
+    throw new Error('支付服务配置不完整，请联系管理员');
+  }
+
   const url = `${ZPAY_CONFIG.baseUrl}${ZPAY_CONFIG.endpoints.query}?act=order&pid=${ZPAY_CONFIG.pid}&key=${ZPAY_CONFIG.key}&out_trade_no=${outTradeNo}`;
 
   try {
     const response = await axios.get(url);
     const result = response.data;
 
-    if (result.code === 1) {
+    console.log('支付查询原始响应:', JSON.stringify(result, null, 2));
+
+    // 根据实际API响应格式调整判断条件
+    // 如果返回的msg是"查询订单号成功！"，说明查询本身是成功的
+    if (result.code === 1 || (result.msg && result.msg.includes('成功'))) {
       return {
         success: true,
         data: {
@@ -122,6 +136,16 @@ const queryPaymentOrder = async (outTradeNo) => {
     }
   } catch (error) {
     console.error('查询订单错误:', error);
+    // 如果错误消息包含"成功"，说明查询本身是成功的，但可能订单状态有问题
+    if (error.message && error.message.includes('成功')) {
+      return {
+        success: true,
+        data: {
+          status: 0, // 默认未支付状态
+          message: error.message
+        }
+      };
+    }
     throw new Error(error.response?.data?.msg || error.message || '查询失败');
   }
 };
@@ -164,6 +188,9 @@ const refundPaymentOrder = async (outTradeNo, money) => {
 };
 
 const handlePaymentNotification = async (notifyData) => {
+  console.log('====== 开始处理支付通知 ======');
+  console.log('通知数据:', JSON.stringify(notifyData, null, 2));
+
   const {
     pid,
     trade_no,
@@ -178,37 +205,58 @@ const handlePaymentNotification = async (notifyData) => {
     buyer
   } = notifyData;
 
-  if (!verifySignature(notifyData, ZPAY_CONFIG.key)) {
+  console.log('开始验证签名...');
+  const signVerified = verifySignature(notifyData, ZPAY_CONFIG.key);
+  console.log('签名验证结果:', signVerified);
+
+  if (!signVerified) {
+    console.error('签名验证失败! 收到的签名:', sign);
     throw new Error('签名验证失败');
   }
 
+  console.log('当前支付状态:', trade_status);
   if (trade_status !== 'TRADE_SUCCESS') {
-    throw new Error('支付状态异常');
+    console.error('支付状态异常，期望: TRADE_SUCCESS, 实际:', trade_status);
+    throw new Error(`支付状态异常: ${trade_status}`);
   }
 
   const transaction = await sequelize.transaction();
 
   try {
+    console.log('查找订单:', out_trade_no);
     const paymentOrder = await PaymentOrder.findOne({
       where: { outTradeNo: out_trade_no },
       transaction
     });
 
     if (!paymentOrder) {
+      console.error('订单不存在:', out_trade_no);
       await transaction.rollback();
       throw new Error('订单不存在');
     }
 
+    console.log('找到订单:', {
+      id: paymentOrder.id,
+      userId: paymentOrder.userId,
+      status: paymentOrder.status,
+      tokenAmount: paymentOrder.tokenAmount,
+      money: paymentOrder.money
+    });
+
     if (paymentOrder.status === 1) {
+      console.log('订单已经处理过了');
       await transaction.commit();
       return { success: true, message: '订单已处理' };
     }
 
+    console.log('验证订单金额:', { 订单金额: paymentOrder.money, 通知金额: money });
     if (parseFloat(paymentOrder.money) !== parseFloat(money)) {
+      console.error('订单金额不匹配!', { 订单金额: paymentOrder.money, 通知金额: money });
       await transaction.rollback();
       throw new Error('订单金额不匹配');
     }
 
+    console.log('更新订单状态为已支付...');
     await paymentOrder.update({
       status: 1,
       tradeNo: trade_no,
@@ -216,11 +264,12 @@ const handlePaymentNotification = async (notifyData) => {
       paidAt: new Date()
     }, { transaction });
 
+    console.log('创建Token交易记录...');
     await TokenTransaction.create({
       userId: paymentOrder.userId,
       type: 'PAYMENT',
       amount: paymentOrder.tokenAmount,
-      balance: 0,
+      balance: 0, // 会在后面更新
       description: `支付充值 - 订单号: ${out_trade_no}`,
       metadata: {
         paymentOrderId: paymentOrder.id,
@@ -229,10 +278,15 @@ const handlePaymentNotification = async (notifyData) => {
       }
     }, { transaction });
 
+    console.log('查找用户并更新余额...');
     const user = await User.findByPk(paymentOrder.userId, { transaction });
+    console.log('用户当前余额:', user.tokenBalance);
     const newBalance = user.tokenBalance + paymentOrder.tokenAmount;
+    console.log('更新后余额:', newBalance);
+
     await user.update({ tokenBalance: newBalance }, { transaction });
 
+    console.log('更新Token交易记录的余额...');
     await TokenTransaction.update(
       { balance: newBalance },
       {
@@ -245,20 +299,28 @@ const handlePaymentNotification = async (notifyData) => {
       }
     );
 
+    console.log('提交事务...');
     await transaction.commit();
+
+    console.log('====== 支付处理成功! ======');
+    console.log('订单ID:', paymentOrder.id);
+    console.log('用户ID:', paymentOrder.userId);
+    console.log('充值Token数量:', paymentOrder.tokenAmount);
+    console.log('用户新余额:', newBalance);
 
     return {
       success: true,
       message: '支付成功',
       data: {
         orderId: paymentOrder.id,
-        tokenAmount: paymentOrder.tokenAmount
+        tokenAmount: paymentOrder.tokenAmount,
+        newBalance: newBalance
       }
     };
 
   } catch (error) {
+    console.error('处理支付通知错误，回滚事务:', error);
     await transaction.rollback();
-    console.error('处理支付通知错误:', error);
     throw error;
   }
 };

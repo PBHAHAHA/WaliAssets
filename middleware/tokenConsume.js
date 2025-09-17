@@ -1,37 +1,33 @@
 const { User } = require('../models');
 const { TOKEN_COSTS } = require('../controllers/tokenController');
+const { sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
 
 const requireTokens = (operationType) => {
   return async (req, res, next) => {
     try {
       const cost = TOKEN_COSTS[operationType];
-      
+
       if (!cost) {
-        return res.status(400).json({
-          success: false,
-          message: '无效的操作类型'
-        });
+        return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '无效的操作类型');
       }
 
       const user = await User.findByPk(req.user.id);
-      
+
       if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+        return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
       }
 
       if (user.tokenBalance < cost) {
-        return res.status(402).json({
-          success: false,
-          message: `Token余额不足，当前余额: ${user.tokenBalance}, 需要: ${cost}`,
-          data: {
+        return sendBusinessError(
+          res,
+          BUSINESS_CODES.TOKEN_INSUFFICIENT,
+          `Token余额不足，当前余额: ${user.tokenBalance}, 需要: ${cost}`,
+          {
             currentBalance: user.tokenBalance,
             required: cost,
             shortfall: cost - user.tokenBalance
           }
-        });
+        );
       }
 
       req.tokenCost = cost;
@@ -40,10 +36,7 @@ const requireTokens = (operationType) => {
 
     } catch (error) {
       console.error('Token检查错误:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return sendSystemError(res, 'Token检查失败');
     }
   };
 };
@@ -55,10 +48,7 @@ const checkTokenBalance = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: '用户不存在'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
     }
 
     req.userTokenBalance = user.tokenBalance;
@@ -66,10 +56,7 @@ const checkTokenBalance = async (req, res, next) => {
 
   } catch (error) {
     console.error('获取Token余额错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '获取Token余额失败');
   }
 };
 

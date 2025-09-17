@@ -195,6 +195,23 @@ ZPAY_KEY=your_secret_key
 
 ## 故障排除
 
+### 支付服务错误
+
+1. **Invalid URL 错误**
+   ```
+   Error: Invalid URL at new URL
+   ```
+   - 检查 `.env` 文件中的 `ZPAY_URL` 是否设置
+   - 确认支付服务商URL格式正确（以http://或https://开头）
+   - 如果不使用支付功能，可以设置虚拟值避免错误
+
+2. **支付服务配置不完整**
+   ```
+   Error: 支付服务配置不完整，请联系管理员
+   ```
+   - 检查 `ZPAY_URL`, `ZPAY_PID`, `ZPAY_PKEY` 是否都已设置
+   - 联系支付服务商获取正确的配置信息
+
 ### 邮件发送失败
 
 1. **检查SMTP配置**

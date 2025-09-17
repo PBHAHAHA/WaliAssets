@@ -3,6 +3,7 @@ const { User, EmailVerification } = require('../models');
 const { addTokens, DEFAULT_REGISTER_TOKENS } = require('./tokenController');
 const { sendVerificationEmail } = require('../services/emailService');
 const { isEmailDomainAllowed, generateVerificationCode, getAllowedDomains } = require('../utils/emailUtils');
+const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -16,29 +17,24 @@ const sendEmailCode = async (req, res) => {
     const { email, type = 'register' } = req.body;
 
     if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: '邮箱地址是必填项'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_MISSING, '邮箱地址是必填项');
     }
 
     // 验证邮箱域名
     if (!isEmailDomainAllowed(email)) {
-      return res.status(400).json({
-        success: false,
-        message: `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
-        allowedDomains: getAllowedDomains()
-      });
+      return sendBusinessError(
+        res,
+        BUSINESS_CODES.EMAIL_DOMAIN_NOT_SUPPORTED,
+        `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
+        { allowedDomains: getAllowedDomains() }
+      );
     }
 
     // 检查邮箱是否已注册（仅注册时检查）
     if (type === 'register') {
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: '邮箱已被注册'
-        });
+        return sendBusinessError(res, BUSINESS_CODES.EMAIL_ALREADY_REGISTERED);
       }
     }
 
@@ -54,10 +50,7 @@ const sendEmailCode = async (req, res) => {
     });
 
     if (recentCode) {
-      return res.status(429).json({
-        success: false,
-        message: '验证码发送过于频繁，请1分钟后再试'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.EMAIL_SEND_TOO_FREQUENT, '验证码发送过于频繁，请1分钟后再试');
     }
 
     // 生成验证码
@@ -75,21 +68,14 @@ const sendEmailCode = async (req, res) => {
     // 发送邮件
     await sendVerificationEmail(email, code, type);
 
-    res.json({
-      success: true,
-      message: '验证码已发送到您的邮箱，请查收',
-      data: {
-        email,
-        expiresIn: 600 // 10分钟
-      }
-    });
+    return sendSuccess(res, {
+      email,
+      expiresIn: 600 // 10分钟
+    }, '验证码已发送到您的邮箱，请查收');
 
   } catch (error) {
     console.error('发送验证码错误:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || '发送验证码失败'
-    });
+    return sendBusinessError(res, BUSINESS_CODES.EMAIL_SEND_FAILED, error.message || '发送验证码失败');
   }
 };
 
@@ -98,26 +84,21 @@ const register = async (req, res) => {
     const { username, email, password, emailCode } = req.body;
 
     if (!username || !email || !password || !emailCode) {
-      return res.status(400).json({
-        success: false,
-        message: '用户名、邮箱、密码和验证码都是必填项'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_MISSING, '用户名、邮箱、密码和验证码都是必填项');
     }
 
     if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: '密码长度至少为6位'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '密码长度至少为6位');
     }
 
     // 验证邮箱域名
     if (!isEmailDomainAllowed(email)) {
-      return res.status(400).json({
-        success: false,
-        message: `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
-        allowedDomains: getAllowedDomains()
-      });
+      return sendBusinessError(
+        res,
+        BUSINESS_CODES.EMAIL_DOMAIN_NOT_SUPPORTED,
+        `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
+        { allowedDomains: getAllowedDomains() }
+      );
     }
 
     // 验证邮箱验证码
@@ -132,17 +113,11 @@ const register = async (req, res) => {
     });
 
     if (!verification) {
-      return res.status(400).json({
-        success: false,
-        message: '验证码无效'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.EMAIL_CODE_INVALID);
     }
 
     if (!verification.isValid()) {
-      return res.status(400).json({
-        success: false,
-        message: '验证码已过期或已使用'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.EMAIL_CODE_EXPIRED, '验证码已过期或已使用');
     }
 
     const existingUser = await User.findOne({
@@ -155,10 +130,7 @@ const register = async (req, res) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: '用户名或邮箱已存在'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.USER_ALREADY_EXISTS, '用户名或邮箱已存在');
     }
 
     // 标记验证码为已使用
@@ -181,39 +153,25 @@ const register = async (req, res) => {
 
     const token = generateToken(user.id);
 
-    res.status(201).json({
-      success: true,
-      message: `用户注册成功，获得 ${DEFAULT_REGISTER_TOKENS} tokens奖励`,
-      data: {
-        user,
-        token,
-        tokenBonus: DEFAULT_REGISTER_TOKENS
-      }
-    });
+    return sendSuccess(res, {
+      user,
+      token,
+      tokenBonus: DEFAULT_REGISTER_TOKENS
+    }, `用户注册成功，获得 ${DEFAULT_REGISTER_TOKENS} tokens奖励`, 201);
 
   } catch (error) {
     console.error('注册错误:', error);
-    
+
     if (error.name === 'SequelizeValidationError') {
       const errors = error.errors.map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: '验证失败',
-        errors
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '验证失败', { errors });
     }
 
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({
-        success: false,
-        message: '用户名或邮箱已存在'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.USER_ALREADY_EXISTS, '用户名或邮箱已存在');
     }
 
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '注册失败');
   }
 };
 
@@ -222,10 +180,7 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: '邮箱和密码都是必填项'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_MISSING, '邮箱和密码都是必填项');
     }
 
     const user = await User.findOne({
@@ -234,72 +189,47 @@ const login = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: '邮箱或密码错误'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.AUTH_LOGIN_FAILED, '邮箱或密码错误');
     }
 
     if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: '账户已被禁用'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.AUTH_USER_DISABLED);
     }
 
     const isPasswordValid = await user.comparePassword(password);
 
     if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: '邮箱或密码错误'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.AUTH_PASSWORD_INCORRECT, '邮箱或密码错误');
     }
 
     await user.update({ lastLoginAt: new Date() });
 
     const token = generateToken(user.id);
 
-    res.json({
-      success: true,
-      message: '登录成功',
-      data: {
-        user,
-        token
-      }
-    });
+    return sendSuccess(res, {
+      user,
+      token
+    }, '登录成功');
 
   } catch (error) {
     console.error('登录错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '登录失败');
   }
 };
 
 const getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
-    
+
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: '用户不存在'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
     }
 
-    res.json({
-      success: true,
-      data: { user }
-    });
+    return sendSuccess(res, { user });
 
   } catch (error) {
     console.error('获取用户信息错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '获取用户信息失败');
   }
 };
 
@@ -309,10 +239,7 @@ const updateProfile = async (req, res) => {
     const user = await User.findByPk(req.user.id);
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: '用户不存在'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
     }
 
     if (username && username !== user.username) {
@@ -321,10 +248,7 @@ const updateProfile = async (req, res) => {
       });
 
       if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: '用户名已存在'
-        });
+        return sendBusinessError(res, BUSINESS_CODES.USER_ALREADY_EXISTS, '用户名已存在');
       }
     }
 
@@ -333,28 +257,17 @@ const updateProfile = async (req, res) => {
       avatar: avatar !== undefined ? avatar : user.avatar
     });
 
-    res.json({
-      success: true,
-      message: '用户信息更新成功',
-      data: { user }
-    });
+    return sendSuccess(res, { user }, '用户信息更新成功');
 
   } catch (error) {
     console.error('更新用户信息错误:', error);
-    
+
     if (error.name === 'SequelizeValidationError') {
       const errors = error.errors.map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: '验证失败',
-        errors
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '验证失败', { errors });
     }
 
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '更新用户信息失败');
   }
 };
 

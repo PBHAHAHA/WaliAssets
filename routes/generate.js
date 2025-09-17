@@ -7,6 +7,7 @@ const animationController = require('../controllers/animationController');
 const { authenticateToken } = require('../middleware/auth');
 const { requireTokens } = require('../middleware/tokenConsume');
 const { GenerationHistory } = require('../models');
+const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
 
 // 图像生成接口
 router.post('/image',
@@ -38,32 +39,23 @@ router.get('/status/:taskId',
             });
 
             if (!task) {
-                return res.status(404).json({
-                    success: false,
-                    error: '任务不存在'
-                });
+                return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_NOT_FOUND, '任务不存在');
             }
 
-            res.json({
-                success: true,
-                data: {
-                    taskId: task.taskId,
-                    status: task.status,
-                    progress: task.progress,
-                    type: task.type,
-                    resultUrl: task.resultUrl,
-                    resultUrls: task.resultUrls,
-                    errorMessage: task.errorMessage,
-                    createdAt: task.createdAt,
-                    updatedAt: task.updatedAt
-                }
+            return sendSuccess(res, {
+                taskId: task.taskId,
+                status: task.status,
+                progress: task.progress,
+                type: task.type,
+                resultUrl: task.resultUrl,
+                resultUrls: task.resultUrls,
+                errorMessage: task.errorMessage,
+                createdAt: task.createdAt,
+                updatedAt: task.updatedAt
             });
         } catch (error) {
             console.error('查询任务状态错误:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
+            return sendSystemError(res, '查询任务状态失败');
         }
     }
 );
@@ -149,28 +141,22 @@ router.get('/history',
             // 统计信息
             const totalTokensConsumed = rows.reduce((sum, item) => sum + item.tokenConsumed, 0);
 
-            res.json({
-                success: true,
-                data: {
-                    history: formattedHistory,
-                    pagination: {
-                        total: count,
-                        page: parseInt(page),
-                        limit: parseInt(limit),
-                        totalPages: Math.ceil(count / limit)
-                    },
-                    summary: {
-                        totalGenerated: count,
-                        totalTokensConsumed: totalTokensConsumed
-                    }
+            return sendSuccess(res, {
+                history: formattedHistory,
+                pagination: {
+                    total: count,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(count / limit)
+                },
+                summary: {
+                    totalGenerated: count,
+                    totalTokensConsumed: totalTokensConsumed
                 }
             });
         } catch (error) {
             console.error('获取生成历史错误:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
+            return sendSystemError(res, '获取生成历史失败');
         }
     }
 );
@@ -191,22 +177,13 @@ router.delete('/history/:id',
             });
 
             if (deleted === 0) {
-                return res.status(404).json({
-                    success: false,
-                    error: '记录不存在'
-                });
+                return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_NOT_FOUND, '记录不存在');
             }
 
-            res.json({
-                success: true,
-                message: '删除成功'
-            });
+            return sendSuccess(res, null, '删除成功');
         } catch (error) {
             console.error('删除生成历史错误:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
+            return sendSystemError(res, '删除生成历史失败');
         }
     }
 );

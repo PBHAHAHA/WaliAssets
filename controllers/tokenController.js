@@ -1,26 +1,36 @@
 const { User, TokenTransaction, sequelize } = require('../models');
+const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
 
 const DEFAULT_REGISTER_TOKENS = 100;
 
 const TOKEN_COSTS = {
-  IMAGE_GENERATION: 10,
+  IMAGE_GENERATION: 20,
   VIDEO_GENERATION: 100
 };
 
 const addTokens = async (userId, type, amount, description = '', metadata = {}) => {
+  console.log('===== addTokens 开始 =====');
+  console.log('参数:', { userId, type, amount, description, metadata });
+
   const transaction = await sequelize.transaction();
-  
+
   try {
+    console.log('查找用户:', userId);
     const user = await User.findByPk(userId, { transaction });
-    
+
     if (!user) {
+      console.error('用户不存在:', userId);
       throw new Error('用户不存在');
     }
 
+    console.log('用户当前余额:', user.tokenBalance);
     const newBalance = user.tokenBalance + amount;
-    
+    console.log('计算新余额:', newBalance);
+
+    console.log('更新用户余额...');
     await user.update({ tokenBalance: newBalance }, { transaction });
-    
+
+    console.log('创建Token交易记录...');
     await TokenTransaction.create({
       userId,
       type,
@@ -30,9 +40,10 @@ const addTokens = async (userId, type, amount, description = '', metadata = {}) 
       metadata
     }, { transaction });
 
+    console.log('提交事务...');
     await transaction.commit();
-    
-    return {
+
+    const result = {
       success: true,
       balance: newBalance,
       transaction: {
@@ -41,7 +52,14 @@ const addTokens = async (userId, type, amount, description = '', metadata = {}) 
         description
       }
     };
+
+    console.log('===== addTokens 成功完成 =====');
+    console.log('返回结果:', result);
+    return result;
+
   } catch (error) {
+    console.error('===== addTokens 发生错误 =====');
+    console.error('错误详情:', error);
     await transaction.rollback();
     throw error;
   }
@@ -49,10 +67,10 @@ const addTokens = async (userId, type, amount, description = '', metadata = {}) 
 
 const consumeTokens = async (userId, type, amount, description = '', metadata = {}) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const user = await User.findByPk(userId, { transaction });
-    
+
     if (!user) {
       throw new Error('用户不存在');
     }
@@ -62,9 +80,9 @@ const consumeTokens = async (userId, type, amount, description = '', metadata = 
     }
 
     const newBalance = user.tokenBalance - amount;
-    
+
     await user.update({ tokenBalance: newBalance }, { transaction });
-    
+
     await TokenTransaction.create({
       userId,
       type,
@@ -75,7 +93,7 @@ const consumeTokens = async (userId, type, amount, description = '', metadata = 
     }, { transaction });
 
     await transaction.commit();
-    
+
     return {
       success: true,
       balance: newBalance,
@@ -99,30 +117,21 @@ const getTokenBalance = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: '用户不存在'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
     }
 
-    res.json({
-      success: true,
-      data: {
-        balance: user.tokenBalance,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email
-        }
+    return sendSuccess(res, {
+      balance: user.tokenBalance,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
       }
     });
 
   } catch (error) {
     console.error('获取token余额错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '获取token余额失败');
   }
 };
 
@@ -138,75 +147,48 @@ const getTokenHistory = async (req, res) => {
       offset: parseInt(offset)
     });
 
-    res.json({
-      success: true,
-      data: {
-        transactions: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
+    return sendSuccess(res, {
+      transactions: rows,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit)
       }
     });
 
   } catch (error) {
     console.error('获取token历史错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '获取token历史失败');
   }
 };
 
 const rechargeTokens = async (req, res) => {
-  try {
-    res.status(410).json({
-      success: false,
-      message: '此接口已废弃，请使用 /api/payment/create 创建支付订单'
-    });
-
-  } catch (error) {
-    console.error('Token充值错误:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || '服务器内部错误'
-    });
-  }
+  return sendBusinessError(res, BUSINESS_CODES.BUSINESS_ERROR, '此接口已废弃，请使用 /api/payment/create 创建支付订单');
 };
 
 const checkTokenCost = async (req, res) => {
   try {
     const { type } = req.params;
-    
+
     const cost = TOKEN_COSTS[type.toUpperCase()];
     if (cost === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: '无效的操作类型'
-      });
+      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '无效的操作类型');
     }
 
     const user = await User.findByPk(req.user.id);
     const canAfford = user.tokenBalance >= cost;
 
-    res.json({
-      success: true,
-      data: {
-        type: type.toUpperCase(),
-        cost,
-        currentBalance: user.tokenBalance,
-        canAfford
-      }
+    return sendSuccess(res, {
+      type: type.toUpperCase(),
+      cost,
+      currentBalance: user.tokenBalance,
+      canAfford
     });
 
   } catch (error) {
     console.error('检查token费用错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
+    return sendSystemError(res, '检查token费用失败');
   }
 };
 

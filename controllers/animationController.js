@@ -1,6 +1,7 @@
 const volcengineService = require('../services/volcengineService');
 const { consumeTokens } = require('./tokenController');
 const { GenerationHistory } = require('../models');
+const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
 
 exports.generateAnimation = async (req, res) => {
     const taskId = `anim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -10,10 +11,7 @@ exports.generateAnimation = async (req, res) => {
         const { model, content } = req.body;
 
         if (!model || !content) {
-            return res.status(400).json({
-                success: false,
-                error: '缺少必要参数: model 和 content'
-            });
+            return sendBusinessError(res, BUSINESS_CODES.PARAM_REQUIRED, '缺少必要参数: model 和 content');
         }
 
         // 创建生成历史记录
@@ -64,15 +62,11 @@ exports.generateAnimation = async (req, res) => {
             metadata: result
         });
 
-        res.json({
-            success: true,
-            message: `视频生成成功，消耗 ${req.tokenCost} tokens`,
-            data: {
-                taskId,
-                ...result,
-                tokenConsumed: req.tokenCost
-            }
-        });
+        return sendSuccess(res, {
+            taskId,
+            ...result,
+            tokenConsumed: req.tokenCost
+        }, `视频生成成功，消耗 ${req.tokenCost} tokens`);
     } catch (error) {
         console.error('动画生成错误:', error);
 
@@ -85,10 +79,14 @@ exports.generateAnimation = async (req, res) => {
             });
         }
 
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            taskId
-        });
+        if (error.message.includes('Token余额不足')) {
+            return sendBusinessError(res, BUSINESS_CODES.TOKEN_INSUFFICIENT, error.message);
+        }
+
+        if (error.message.includes('生成失败') || error.message.includes('AI服务')) {
+            return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_FAILED, error.message);
+        }
+
+        return sendSystemError(res, '视频生成失败', { taskId });
     }
 }
