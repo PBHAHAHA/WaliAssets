@@ -1,6 +1,6 @@
 const { User } = require('../models');
 const { TOKEN_COSTS } = require('../controllers/tokenController');
-const { sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendBusinessError, sendSystemError } = require('../utils/response');
 
 const requireTokens = (operationType) => {
   return async (req, res, next) => {
@@ -8,19 +8,19 @@ const requireTokens = (operationType) => {
       const cost = TOKEN_COSTS[operationType];
 
       if (!cost) {
-        return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '无效的操作类型');
+        return sendBusinessError(res, 0, '无效的操作类型');
       }
 
       const user = await User.findByPk(req.user.id);
 
       if (!user) {
-        return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
+        return sendBusinessError(res, 0, '用户不存在');
       }
 
       if (user.tokenBalance < cost) {
         return sendBusinessError(
           res,
-          BUSINESS_CODES.TOKEN_INSUFFICIENT,
+          0,
           `Token余额不足，当前余额: ${user.tokenBalance}, 需要: ${cost}`,
           {
             currentBalance: user.tokenBalance,
@@ -48,7 +48,7 @@ const checkTokenBalance = async (req, res, next) => {
     });
 
     if (!user) {
-      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
+      return sendBusinessError(res, 0);
     }
 
     req.userTokenBalance = user.tokenBalance;

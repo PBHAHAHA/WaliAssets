@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
-const { sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendBusinessError, sendSystemError } = require('../utils/response');
 
 const authenticateToken = async (req, res, next) => {
   try {
@@ -8,18 +8,18 @@ const authenticateToken = async (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_TOKEN_MISSING, '访问被拒绝，请提供有效的token');
+      return sendBusinessError(res, 0, '访问被拒绝，请提供有效的token');
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findByPk(decoded.id);
 
     if (!user) {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_USER_NOT_FOUND, '无效的token，用户不存在');
+      return sendBusinessError(res, 0, '无效的token，用户不存在');
     }
 
     if (!user.isActive) {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_USER_DISABLED);
+      return sendBusinessError(res, 0, '账户已被禁用');
     }
 
     req.user = user;
@@ -29,11 +29,11 @@ const authenticateToken = async (req, res, next) => {
     console.error('认证错误:', error);
 
     if (error.name === 'JsonWebTokenError') {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_TOKEN_INVALID);
+      return sendBusinessError(res, 0, '无效的token');
     }
 
     if (error.name === 'TokenExpiredError') {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_TOKEN_EXPIRED);
+      return sendBusinessError(res, 0, 'token已过期');
     }
 
     return sendSystemError(res, '认证失败');

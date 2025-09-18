@@ -7,7 +7,7 @@ const animationController = require('../controllers/animationController');
 const { authenticateToken } = require('../middleware/auth');
 const { requireTokens } = require('../middleware/tokenConsume');
 const { GenerationHistory } = require('../models');
-const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendSuccess, sendBusinessError, sendSystemError } = require('../utils/response');
 
 // 图像生成接口
 router.post('/image',
@@ -39,7 +39,7 @@ router.get('/status/:taskId',
             });
 
             if (!task) {
-                return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_NOT_FOUND, '任务不存在');
+                return sendBusinessError(res, 0, '任务不存在');
             }
 
             return sendSuccess(res, {
@@ -177,7 +177,7 @@ router.delete('/history/:id',
             });
 
             if (deleted === 0) {
-                return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_NOT_FOUND, '记录不存在');
+                return sendBusinessError(res, 0, '记录不存在');
             }
 
             return sendSuccess(res, null, '删除成功');

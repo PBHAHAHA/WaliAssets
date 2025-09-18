@@ -6,7 +6,7 @@ const {
   getClientIp
 } = require('../services/paymentService');
 const { PaymentOrder, sequelize } = require('../models');
-const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendSuccess, sendBusinessError, sendSystemError } = require('../utils/response');
 
 const TOKEN_PACKAGES = {
   'package_100': { tokens: 100, price: 2.00, name: '100 Tokens' },
@@ -22,11 +22,11 @@ const createPayment = async (req, res) => {
     const userId = req.user.id;
 
     if (!TOKEN_PACKAGES[packageType]) {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_PACKAGE_INVALID, '无效的套餐类型');
+      return sendBusinessError(res, 0, '无效的套餐类型');
     }
 
     if (!['alipay', 'wxpay'].includes(paymentType)) {
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '不支持的支付方式');
+      return sendBusinessError(res, 0, '不支持的支付方式');
     }
 
     const packageInfo = TOKEN_PACKAGES[packageType];
@@ -55,7 +55,7 @@ const createPayment = async (req, res) => {
     console.error('创建支付订单错误:', error);
 
     if (error.message === '支付服务配置不完整，请联系管理员') {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_CONFIG_INCOMPLETE, error.message);
+      return sendBusinessError(res, 0, error.message);
     }
 
     return sendSystemError(res, error.message || '创建支付订单失败');
@@ -79,7 +79,7 @@ const queryOrder = async (req, res) => {
     }
 
     if (!order) {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_ORDER_NOT_FOUND, '订单不存在');
+      return sendBusinessError(res, 0, '订单不存在');
     }
 
     const remoteResult = await queryPaymentOrder(order.outTradeNo);
@@ -148,7 +148,7 @@ const queryOrder = async (req, res) => {
     console.error('查询订单错误:', error);
 
     if (error.message === '支付服务配置不完整，请联系管理员') {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_CONFIG_INCOMPLETE, error.message);
+      return sendBusinessError(res, 0, error.message);
     }
 
     return sendSystemError(res, error.message || '查询订单失败');
@@ -199,15 +199,15 @@ const requestRefund = async (req, res) => {
     });
 
     if (!order) {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_ORDER_NOT_FOUND, '订单不存在');
+      return sendBusinessError(res, 0, '订单不存在');
     }
 
     if (order.status !== 1) {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_STATUS_ERROR, '只能退款已支付的订单');
+      return sendBusinessError(res, 0, '只能退款已支付的订单');
     }
 
     if (order.status === 2) {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_STATUS_ERROR, '订单已退款');
+      return sendBusinessError(res, 0, '订单已退款');
     }
 
     const result = await refundPaymentOrder(order.outTradeNo, order.money);
@@ -273,7 +273,7 @@ const testPaymentSuccess = async (req, res) => {
     });
 
     if (!order) {
-      return sendBusinessError(res, BUSINESS_CODES.PAYMENT_ORDER_NOT_FOUND, '订单不存在');
+      return sendBusinessError(res, 0, '订单不存在');
     }
 
     if (order.status === 1) {

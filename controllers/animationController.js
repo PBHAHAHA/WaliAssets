@@ -1,7 +1,7 @@
 const volcengineService = require('../services/volcengineService');
 const { consumeTokens } = require('./tokenController');
 const { GenerationHistory } = require('../models');
-const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendSuccess, sendBusinessError, sendSystemError } = require('../utils/response');
 
 exports.generateAnimation = async (req, res) => {
     const taskId = `anim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -11,7 +11,7 @@ exports.generateAnimation = async (req, res) => {
         const { model, content } = req.body;
 
         if (!model || !content) {
-            return sendBusinessError(res, BUSINESS_CODES.PARAM_REQUIRED, '缺少必要参数: model 和 content');
+            return sendBusinessError(res, 0, '缺少必要参数: model 和 content');
         }
 
         // 创建生成历史记录
@@ -80,11 +80,11 @@ exports.generateAnimation = async (req, res) => {
         }
 
         if (error.message.includes('Token余额不足')) {
-            return sendBusinessError(res, BUSINESS_CODES.TOKEN_INSUFFICIENT, error.message);
+            return sendBusinessError(res, 0, error.message);
         }
 
         if (error.message.includes('生成失败') || error.message.includes('AI服务')) {
-            return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_FAILED, error.message);
+            return sendBusinessError(res, 0, error.message);
         }
 
         return sendSystemError(res, '视频生成失败', { taskId });

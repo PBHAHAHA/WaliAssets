@@ -2,7 +2,7 @@
 const volcengineService = require('../services/volcengineService');
 const { consumeTokens } = require('./tokenController');
 const { GenerationHistory } = require('../models');
-const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendSuccess, sendBusinessError, sendSystemError } = require('../utils/response');
 
 exports.generateImage = async (req, res) => {
     const taskId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -13,13 +13,22 @@ exports.generateImage = async (req, res) => {
             prompt,
             size = "512x512",
             guidance_scale = 2.5,
-            seed = 12345,
+            seed,
             watermark = false,
             image
         } = req.body;
 
+        // 处理seed参数 - 火山引擎要求seed为正整数或不传
+        let validSeed = undefined;
+        if (seed !== undefined && seed !== null) {
+            const parsedSeed = parseInt(seed);
+            if (!isNaN(parsedSeed) && parsedSeed > 0 && parsedSeed <= 2147483647) {
+                validSeed = parsedSeed;
+            }
+        }
+
         if (!prompt || !prompt.trim()) {
-            return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, 'Prompt不能为空');
+            return sendBusinessError(res, 0, 'Prompt不能为空');
         }
 
         // 创建生成历史记录
@@ -30,7 +39,7 @@ exports.generateImage = async (req, res) => {
             parameters: {
                 size,
                 guidance_scale,
-                seed,
+                seed: validSeed,
                 watermark,
                 image
             },
@@ -51,7 +60,7 @@ exports.generateImage = async (req, res) => {
                 prompt,
                 size,
                 guidance_scale,
-                seed,
+                seed: validSeed,
                 watermark,
                 taskId
             }
@@ -67,9 +76,13 @@ exports.generateImage = async (req, res) => {
             prompt,
             size,
             guidance_scale,
-            seed,
             watermark
         };
+
+        // 只有当seed有效时才添加到参数中
+        if (validSeed !== undefined) {
+            params.seed = validSeed;
+        }
 
         console.log("开始生成图像");
 
@@ -104,11 +117,11 @@ exports.generateImage = async (req, res) => {
         }
 
         if (error.message.includes('Token余额不足')) {
-            return sendBusinessError(res, BUSINESS_CODES.TOKEN_INSUFFICIENT, error.message);
+            return sendBusinessError(res, 0, error.message);
         }
 
         if (error.message.includes('生成失败') || error.message.includes('AI服务')) {
-            return sendBusinessError(res, BUSINESS_CODES.GENERATION_TASK_FAILED, error.message);
+            return sendBusinessError(res, 0, error.message);
         }
 
         return sendSystemError(res, '图片生成失败', { taskId });

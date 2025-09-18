@@ -3,7 +3,7 @@ const { User, EmailVerification } = require('../models');
 const { addTokens, DEFAULT_REGISTER_TOKENS } = require('./tokenController');
 const { sendVerificationEmail } = require('../services/emailService');
 const { isEmailDomainAllowed, generateVerificationCode, getAllowedDomains } = require('../utils/emailUtils');
-const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendSuccess, sendBusinessError, sendSystemError } = require('../utils/response');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -17,14 +17,14 @@ const sendEmailCode = async (req, res) => {
     const { email, type = 'register' } = req.body;
 
     if (!email) {
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_MISSING, '邮箱地址是必填项');
+      return sendBusinessError(res, 0, '邮箱地址是必填项');
     }
 
     // 验证邮箱域名
     if (!isEmailDomainAllowed(email)) {
       return sendBusinessError(
         res,
-        BUSINESS_CODES.EMAIL_DOMAIN_NOT_SUPPORTED,
+        0,
         `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
         { allowedDomains: getAllowedDomains() }
       );
@@ -34,7 +34,7 @@ const sendEmailCode = async (req, res) => {
     if (type === 'register') {
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
-        return sendBusinessError(res, BUSINESS_CODES.EMAIL_ALREADY_REGISTERED);
+        return sendBusinessError(res, 0, '邮箱已被注册');
       }
     }
 
@@ -50,7 +50,7 @@ const sendEmailCode = async (req, res) => {
     });
 
     if (recentCode) {
-      return sendBusinessError(res, BUSINESS_CODES.EMAIL_SEND_TOO_FREQUENT, '验证码发送过于频繁，请1分钟后再试');
+      return sendBusinessError(res, 0, '验证码发送过于频繁，请1分钟后再试');
     }
 
     // 生成验证码
@@ -75,7 +75,7 @@ const sendEmailCode = async (req, res) => {
 
   } catch (error) {
     console.error('发送验证码错误:', error);
-    return sendBusinessError(res, BUSINESS_CODES.EMAIL_SEND_FAILED, error.message || '发送验证码失败');
+    return sendBusinessError(res, 0, error.message || '发送验证码失败');
   }
 };
 
@@ -84,18 +84,18 @@ const register = async (req, res) => {
     const { username, email, password, emailCode } = req.body;
 
     if (!username || !email || !password || !emailCode) {
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_MISSING, '用户名、邮箱、密码和验证码都是必填项');
+      return sendBusinessError(res, 0, '用户名、邮箱、密码和验证码都是必填项');
     }
 
     if (password.length < 6) {
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '密码长度至少为6位');
+      return sendBusinessError(res, 0, '密码长度至少为6位');
     }
 
     // 验证邮箱域名
     if (!isEmailDomainAllowed(email)) {
       return sendBusinessError(
         res,
-        BUSINESS_CODES.EMAIL_DOMAIN_NOT_SUPPORTED,
+        0,
         `暂时只支持以下邮箱注册：${getAllowedDomains().join(', ')}`,
         { allowedDomains: getAllowedDomains() }
       );
@@ -113,11 +113,11 @@ const register = async (req, res) => {
     });
 
     if (!verification) {
-      return sendBusinessError(res, BUSINESS_CODES.EMAIL_CODE_INVALID);
+      return sendBusinessError(res, 0, '验证码无效');
     }
 
     if (!verification.isValid()) {
-      return sendBusinessError(res, BUSINESS_CODES.EMAIL_CODE_EXPIRED, '验证码已过期或已使用');
+      return sendBusinessError(res, 0, '验证码已过期或已使用');
     }
 
     const existingUser = await User.findOne({
@@ -130,7 +130,7 @@ const register = async (req, res) => {
     });
 
     if (existingUser) {
-      return sendBusinessError(res, BUSINESS_CODES.USER_ALREADY_EXISTS, '用户名或邮箱已存在');
+      return sendBusinessError(res, 0, '用户名或邮箱已存在');
     }
 
     // 标记验证码为已使用
@@ -164,11 +164,11 @@ const register = async (req, res) => {
 
     if (error.name === 'SequelizeValidationError') {
       const errors = error.errors.map(err => err.message);
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '验证失败', { errors });
+      return sendBusinessError(res, 0, '验证失败', { errors });
     }
 
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return sendBusinessError(res, BUSINESS_CODES.USER_ALREADY_EXISTS, '用户名或邮箱已存在');
+      return sendBusinessError(res, 0, '用户名或邮箱已存在');
     }
 
     return sendSystemError(res, '注册失败');
@@ -180,7 +180,7 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_MISSING, '邮箱和密码都是必填项');
+      return sendBusinessError(res, 0, '邮箱和密码都是必填项');
     }
 
     const user = await User.findOne({
@@ -189,17 +189,17 @@ const login = async (req, res) => {
     });
 
     if (!user) {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_LOGIN_FAILED, '邮箱或密码错误');
+      return sendBusinessError(res, 0, '邮箱或密码错误');
     }
 
     if (!user.isActive) {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_USER_DISABLED);
+      return sendBusinessError(res, 0, '账户已被禁用');
     }
 
     const isPasswordValid = await user.comparePassword(password);
 
     if (!isPasswordValid) {
-      return sendBusinessError(res, BUSINESS_CODES.AUTH_PASSWORD_INCORRECT, '邮箱或密码错误');
+      return sendBusinessError(res, 0, '邮箱或密码错误');
     }
 
     await user.update({ lastLoginAt: new Date() });
@@ -222,7 +222,7 @@ const getProfile = async (req, res) => {
     const user = await User.findByPk(req.user.id);
 
     if (!user) {
-      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
+      return sendBusinessError(res, 0, '用户不存在');
     }
 
     return sendSuccess(res, { user });
@@ -239,7 +239,7 @@ const updateProfile = async (req, res) => {
     const user = await User.findByPk(req.user.id);
 
     if (!user) {
-      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
+      return sendBusinessError(res, 0, '用户不存在');
     }
 
     if (username && username !== user.username) {
@@ -248,7 +248,7 @@ const updateProfile = async (req, res) => {
       });
 
       if (existingUser) {
-        return sendBusinessError(res, BUSINESS_CODES.USER_ALREADY_EXISTS, '用户名已存在');
+        return sendBusinessError(res, 0, '用户名已存在');
       }
     }
 
@@ -264,7 +264,7 @@ const updateProfile = async (req, res) => {
 
     if (error.name === 'SequelizeValidationError') {
       const errors = error.errors.map(err => err.message);
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '验证失败', { errors });
+      return sendBusinessError(res, 0, '验证失败', { errors });
     }
 
     return sendSystemError(res, '更新用户信息失败');

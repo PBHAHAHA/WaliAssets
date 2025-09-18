@@ -1,5 +1,5 @@
 const { User, TokenTransaction, sequelize } = require('../models');
-const { sendSuccess, sendBusinessError, sendSystemError, BUSINESS_CODES } = require('../utils/response');
+const { sendSuccess, sendBusinessError, sendSystemError } = require('../utils/response');
 
 const DEFAULT_REGISTER_TOKENS = 100;
 
@@ -117,7 +117,7 @@ const getTokenBalance = async (req, res) => {
     });
 
     if (!user) {
-      return sendBusinessError(res, BUSINESS_CODES.USER_NOT_FOUND);
+      return sendBusinessError(res, 0, '用户不存在');
     }
 
     return sendSuccess(res, {
@@ -164,7 +164,7 @@ const getTokenHistory = async (req, res) => {
 };
 
 const rechargeTokens = async (req, res) => {
-  return sendBusinessError(res, BUSINESS_CODES.BUSINESS_ERROR, '此接口已废弃，请使用 /api/payment/create 创建支付订单');
+  return sendBusinessError(res, 0, '此接口已废弃，请使用 /api/payment/create 创建支付订单');
 };
 
 const checkTokenCost = async (req, res) => {
@@ -173,7 +173,7 @@ const checkTokenCost = async (req, res) => {
 
     const cost = TOKEN_COSTS[type.toUpperCase()];
     if (cost === undefined) {
-      return sendBusinessError(res, BUSINESS_CODES.PARAM_INVALID, '无效的操作类型');
+      return sendBusinessError(res, 0, '无效的操作类型');
     }
 
     const user = await User.findByPk(req.user.id);
