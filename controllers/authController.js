@@ -271,10 +271,62 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// 给指定账号增加token
+const addUserTokens = async (req, res) => {
+  try {
+    const { userId, tokenAmount, verifyCode } = req.body;
+
+    // 参数验证
+    if (!userId || !tokenAmount || !verifyCode) {
+      return sendBusinessError(res, 0, '用户ID、token数量和校验码都是必填项');
+    }
+
+    // 校验码验证
+    if (verifyCode !== 'pubing') {
+      return sendBusinessError(res, 0, '校验码错误');
+    }
+
+    // 验证token数量
+    if (typeof tokenAmount !== 'number' || tokenAmount <= 0) {
+      return sendBusinessError(res, 0, 'token数量必须是大于0的数字');
+    }
+
+    // 查找用户
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return sendBusinessError(res, 0, '用户不存在');
+    }
+
+    // 给用户增加token
+    await addTokens(
+      userId,
+      'ADMIN_ADJUST',
+      tokenAmount,
+      '管理员手动添加',
+      { adminAction: true, timestamp: new Date() }
+    );
+
+    // 重新获取用户信息以返回最新的token余额
+    const updatedUser = await User.findByPk(userId);
+
+    return sendSuccess(res, {
+      userId: updatedUser.id,
+      username: updatedUser.username,
+      addedTokens: tokenAmount,
+      currentTokenBalance: updatedUser.tokenBalance
+    }, `成功为用户增加 ${tokenAmount} tokens`);
+
+  } catch (error) {
+    console.error('添加用户tokens错误:', error);
+    return sendSystemError(res, '添加tokens失败');
+  }
+};
+
 module.exports = {
   sendEmailCode,
   register,
   login,
   getProfile,
-  updateProfile
+  updateProfile,
+  addUserTokens
 };

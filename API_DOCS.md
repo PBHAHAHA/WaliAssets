@@ -155,6 +155,87 @@
 }
 ```
 
+### 管理员给用户增加Token
+- **接口**: `POST /api/auth/add-tokens`
+- **描述**: 管理员给指定用户增加token（需要校验码）
+- **请求体**:
+```json
+{
+  "userId": "uuid-string",
+  "tokenAmount": 100,
+  "verifyCode": "pubing"
+}
+```
+- **成功响应**:
+```json
+{
+  "success": true,
+  "code": 1,
+  "message": "成功为用户增加 100 tokens",
+  "data": {
+    "userId": "uuid-string",
+    "username": "username",
+    "addedTokens": 100,
+    "currentTokenBalance": 200
+  }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "code": 0,
+  "message": "校验码错误",
+  "data": null
+}
+```
+
+## 用户管理 `/api/user`
+
+### 获取所有注册用户
+- **接口**: `GET /api/user/all`
+- **描述**: 获取所有注册用户列表（需要校验码）
+- **查询参数**:
+  - `page`: 页码 (默认: 1)
+  - `limit`: 每页数量 (默认: 20, 最大: 100)
+  - `verifyCode`: 校验码 (必填: "pubing")
+- **成功响应**:
+```json
+{
+  "success": true,
+  "code": 1,
+  "message": "成功获取 10 个用户信息",
+  "data": {
+    "users": [
+      {
+        "id": "uuid-string",
+        "username": "username",
+        "email": "user@qq.com",
+        "tokenBalance": 100,
+        "isActive": true,
+        "createdAt": "2024-01-01T12:00:00Z",
+        "lastLoginAt": "2024-01-02T10:30:00Z"
+      }
+    ],
+    "pagination": {
+      "total": 50,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 3
+    }
+  }
+}
+```
+- **错误响应**:
+```json
+{
+  "success": false,
+  "code": 0,
+  "message": "校验码错误",
+  "data": null
+}
+```
+
 ## Token管理 `/api/token`
 
 ### 获取Token余额

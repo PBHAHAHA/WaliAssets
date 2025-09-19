@@ -5,6 +5,7 @@ const authRoutes = require('./auth');
 const tokenRoutes = require('./token');
 const paymentRoutes = require('./payment');
 const generateRoutes = require('./generate');
+const userRoutes = require('./user');
 
 router.get("/", (req, res) => {
     res.json({
@@ -23,5 +24,8 @@ router.use('/payment', paymentRoutes);
 
 // 生成路由
 router.use('/generate', generateRoutes);
+
+// 用户管理路由
+router.use('/user', userRoutes);
 
 module.exports = router;
